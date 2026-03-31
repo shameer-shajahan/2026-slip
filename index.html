@@ -250,6 +250,13 @@
     top: 94%;
     left: 14.65%;
     font-size: 10px;
+    width: 67%;
+    max-width: 67%;
+    line-height: 1.1;
+    min-height: 24px;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: anywhere;
   }
 
   .page-num {
@@ -452,7 +459,7 @@ function fitPageText(page) {
   fitFieldText(page.querySelector('.pos-D'), { maxHeightPct: 0.04, minFont: 10 });
   fitFieldText(page.querySelector('.pos-E'), { maxHeightPct: 0.04, minFont: 10.5 });
   fitFieldText(page.querySelector('.pos-F'), { maxHeightPct: 0.04, minFont: 12 });
-  fitFieldText(page.querySelector('.pos-G'), { maxHeightPct: 0.04, minFont: 9.5 });
+  fitFieldText(page.querySelector('.pos-G'), { maxHeightPct: 0.05, minFont: 9.5 });
 }
 
 function renderPages(rows, colMap) {
@@ -476,7 +483,7 @@ function renderPages(rows, colMap) {
       { cls: 'pos-D field-mask field-single field-strong', key: 'D' },
       { cls: 'pos-E field-mask field-single', key: 'E' },
       { cls: 'pos-F field-mask field-single field-strong', key: 'F' },
-      { cls: 'pos-G field-mask field-single field-strong', key: 'G' },
+      { cls: 'pos-G field-mask field-strong', key: 'G' },
     ].forEach(f => {
       const div = document.createElement('div');
       div.className   = 'field ' + f.cls;
