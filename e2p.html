@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A5 Print Overlay</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, sans-serif;
+    background: #e0e0e0;
+    padding: 20px;
+  }
+
+  #controls {
+    background: #fff;
+    border-radius: 10px;
+    padding: 24px 28px;
+    max-width: 620px;
+    margin: 0 auto 30px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.15);
+  }
+  #controls h2 { margin-bottom: 6px; font-size: 18px; color: #222; }
+  #controls p  { font-size: 13px; color: #666; margin-bottom: 4px; }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 8px;
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .upload-box {
+    border: 2px dashed #aaa;
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+  }
+  .upload-box:hover { border-color: #333; background: #fafafa; }
+  .upload-box input {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-box span { font-size: 14px; color: #555; pointer-events: none; }
+
+  /* Background image upload — purple accent */
+  .upload-box.bg-box {
+    border-color: #7b68ee;
+    background: #f5f3ff;
+  }
+  .upload-box.bg-box:hover { border-color: #5a4fcf; background: #ede9ff; }
+  .upload-box.bg-box span  { color: #5a4fcf; }
+
+  #bg-preview-wrap {
+    display: none;
+    margin-top: 10px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #d0c8ff;
+    position: relative;
+    background: #f0f0f0;
+  }
+  #bg-preview-wrap img {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    display: block;
+  }
+  #bg-status {
+    font-size: 12px;
+    color: #5a4fcf;
+    padding: 6px 10px;
+    background: #ede9ff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #bg-remove {
+    background: none;
+    border: none;
+    color: #c0392b;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  #bg-remove:hover { text-decoration: underline; }
+
+  #info { margin-top: 14px; font-size: 13px; color: #444; }
+  #info strong { color: #111; }
+
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 22px;
+    background: #111;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .2s, opacity .2s;
+  }
+  .btn:hover:not(:disabled) { background: #333; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.pdf { background: #c0392b; }
+  .btn.pdf:hover:not(:disabled) { background: #96281b; }
+
+  #progress-wrap {
+    display: none;
+    margin-top: 14px;
+    background: #eee;
+    border-radius: 6px;
+    overflow: hidden;
+    height: 10px;
+  }
+  #progress-bar {
+    height: 100%;
+    width: 0%;
+    background: #c0392b;
+    transition: width .2s;
+    border-radius: 6px;
+  }
+  #progress-label { font-size: 12px; color: #666; margin-top: 5px; }
+
+  #pages { display: flex; flex-direction: column; align-items: center; gap: 30px; }
+
+  /* A5: 559×794px at 96dpi */
+  .a5-page {
+    width:  559px;
+    height: 794px;
+    background-color: #fff;
+    background-size: 100% 100%;
+    background-position: center center;
+    background-repeat: no-repeat;
+    position: relative;
+    border: 1px dashed #bbb;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .field {
+    position: absolute;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.3;
+    color: #000;
+    white-space: pre-wrap;
+    word-break: break-word;
+    z-index: 1;
+    padding: 0 4px;
+  }
+
+  .field-mask {
+    background: rgba(255,255,255,.96);
+  }
+
+  .field-single {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .field-strong {
+    font-weight: bold;
+  }
+
+  .pos-C-top {
+    top: 5.05%;
+    left: 15.70%;
+    font-weight: bold;
+    width: 42%;
+    min-height: 18px;
+    font-size: 16px;
+    line-height: 1.1;
+  }
+  .pos-A {
+    top: 81.9%;
+    left: 18.8%;
+    width: 7.5%;
+    min-height: 22px;
+    font-size: 17px;
+    line-height: 1;
+  }
+  .pos-B {
+    top: 81.9%;
+    left: 73.7%;
+    width: 16.5%;
+    min-height: 22px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .pos-C-bot {
+    top: 84.45%;
+    left: 18.8%;
+    width: 44%;
+    min-height: 24px;
+    font-size: 17px;
+    line-height: 1.05;
+  }
+  .pos-D {
+    top: 84.75%;
+    left: 73.7%;
+    width: 9.6%;
+    min-height: 22px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .pos-E {
+    top: 87.90%;
+    left: 18.8%;
+    width: 42%;
+    min-height: 24px;
+    font-size: 17px;
+    line-height: 1.05;
+  }
+  .pos-F {
+    top: 91.40%;
+    left: 18.8%;
+    width: 4%;
+    min-height: 18px;
+    font-size: 17px;
+    line-height: 1;
+  }
+  .pos-G {
+    top: 93%;
+    left: 14.65%;
+    width: 67%;
+    min-height: 24px;
+    font-size: 16px;
+    line-height: 1.05;
+  }
+
+  .page-num {
+    position: absolute;
+    top: -22px; left: 0;
+    font-size: 12px; color: #666;
+  }
+
+  @media print {
+    @page { size: A5 portrait; margin: 0; }
+    html, body { background: none; padding: 0; margin: 0; }
+    #controls  { display: none !important; }
+    #pages     { gap: 0; }
+    .a5-page   {
+      width: 148mm; height: 210mm;
+      page-break-after: always;
+      border: none;
+      background-size: 100% 100% !important;
+      background-position: center center !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .page-num { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <h2>📄 A5 Print Overlay — വോട്ടേഴ്സ് സ്ലിപ്പ്</h2>
+  <p>Upload your background template image and Excel data. Each row generates one A5 page.</p>
+
+  <!-- ── Step 1: Background Image ── -->
+  <div class="section-label">🖼️ Step 1 — Background Template Image</div>
+  <div class="upload-box bg-box">
+    <input type="file" id="bgInput" accept="image/png,image/jpeg,image/jpg,image/webp">
+    <span>📂 Click to upload background image (JPG / PNG)</span>
+  </div>
+  <div id="bg-preview-wrap">
+    <img id="bg-preview" src="" alt="Background preview">
+    <div id="bg-status">
+      <span id="bg-filename">background.jpg</span>
+      <button id="bg-remove">✕ Remove</button>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Excel Data ── -->
+  <div class="section-label">📊 Step 2 — Excel / CSV Data File</div>
+  <div class="upload-box">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    <span>📂 Click to choose Excel / CSV &nbsp;(columns: A, B, C, D, E, F, G)</span>
+  </div>
+
+  <div id="info" style="display:none">
+    Loaded: <strong id="fileName"></strong> — <strong id="rowCount"></strong> rows found.
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="printBtn" disabled onclick="window.print()">🖨️ Print All Pages</button>
+    <button class="btn pdf" id="pdfBtn" disabled onclick="downloadPDF()">⬇️ Download PDF (A5)</button>
+  </div>
+
+  <div id="progress-wrap"><div id="progress-bar"></div></div>
+  <div id="progress-label"></div>
+</div>
+
+<div id="pages"></div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+const bgInput       = document.getElementById('bgInput');
+const bgPreviewWrap = document.getElementById('bg-preview-wrap');
+const bgPreviewImg  = document.getElementById('bg-preview');
+const bgFilename    = document.getElementById('bg-filename');
+const bgRemoveBtn   = document.getElementById('bg-remove');
+const fileInput     = document.getElementById('fileInput');
+const pagesDiv      = document.getElementById('pages');
+const infoDiv       = document.getElementById('info');
+const printBtn      = document.getElementById('printBtn');
+const pdfBtn        = document.getElementById('pdfBtn');
+const progressWrap  = document.getElementById('progress-wrap');
+const progressBar   = document.getElementById('progress-bar');
+const progressLabel = document.getElementById('progress-label');
+
+let bgDataURL = null;
+
+// ── Background image ──
+bgInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    bgDataURL = evt.target.result;
+    bgPreviewImg.src = bgDataURL;
+    bgFilename.textContent = file.name;
+    bgPreviewWrap.style.display = 'block';
+    applyBgToAllPages();
+  };
+  reader.readAsDataURL(file);
+});
+
+bgRemoveBtn.addEventListener('click', function() {
+  bgDataURL = null;
+  bgInput.value = '';
+  bgPreviewImg.src = '';
+  bgPreviewWrap.style.display = 'none';
+  applyBgToAllPages();
+});
+
+function applyBgToAllPages() {
+  document.querySelectorAll('.a5-page').forEach(page => {
+    page.style.backgroundImage = bgDataURL ? `url('${bgDataURL}')` : 'none';
+  });
+}
+
+// ── Excel / CSV ──
+fileInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const data     = new Uint8Array(evt.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet    = workbook.Sheets[workbook.SheetNames[0]];
+    const rows     = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+    if (rows.length < 1) { alert('No data found in file.'); return; }
+
+    const firstRow = rows[0].map(c => String(c).trim().toUpperCase());
+    const colMap   = { A:0, B:1, C:2, D:3, E:4, F:5, G:6 };
+    let dataRows;
+
+    if (['A','B','C','D','E','F','G'].some(h => firstRow.includes(h))) {
+      firstRow.forEach((h,i) => { if (colMap.hasOwnProperty(h)) colMap[h] = i; });
+      dataRows = rows.slice(1).filter(r => r.some(c => c !== ''));
+    } else {
+      dataRows = rows.filter(r => r.some(c => c !== ''));
+    }
+
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('rowCount').textContent  = dataRows.length;
+    infoDiv.style.display = 'block';
+    printBtn.disabled = false;
+    pdfBtn.disabled   = false;
+
+    renderPages(dataRows, colMap);
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function val(row, colMap, key) {
+  const idx = colMap[key];
+  return (idx !== undefined && row[idx] !== undefined) ? String(row[idx]) : '';
+}
+
+function fitFieldText(field, options = {}) {
+  if (!field) return;
+
+  const page = field.closest('.a5-page');
+  if (!page) return;
+
+  const maxHeight = options.maxHeightPct ? page.clientHeight * options.maxHeightPct : null;
+  const minFont   = options.minFont ?? 12;
+  let fontSize    = parseFloat(window.getComputedStyle(field).fontSize);
+  const lineHeightPx = parseFloat(window.getComputedStyle(field).lineHeight);
+  const lineHeightRatio = Number.isFinite(lineHeightPx / fontSize) ? (lineHeightPx / fontSize) : 1.3;
+
+  while (fontSize > minFont) {
+    const tooTall = maxHeight ? field.scrollHeight > maxHeight : false;
+    const tooWide = field.scrollWidth > field.clientWidth + 1;
+    if (!tooTall && !tooWide) break;
+
+    fontSize -= 0.25;
+    field.style.fontSize = fontSize.toFixed(2) + 'px';
+    field.style.lineHeight = lineHeightRatio.toFixed(3);
+  }
+}
+
+function fitPageText(page) {
+  fitFieldText(page.querySelector('.pos-C-top'), { maxHeightPct: 0.04, minFont: 10.5 });
+  fitFieldText(page.querySelector('.pos-A'), { maxHeightPct: 0.04, minFont: 12 });
+  fitFieldText(page.querySelector('.pos-B'), { maxHeightPct: 0.04, minFont: 10 });
+  fitFieldText(page.querySelector('.pos-C-bot'), { maxHeightPct: 0.04, minFont: 10.5 });
+  fitFieldText(page.querySelector('.pos-D'), { maxHeightPct: 0.04, minFont: 10 });
+  fitFieldText(page.querySelector('.pos-E'), { maxHeightPct: 0.04, minFont: 10.5 });
+  fitFieldText(page.querySelector('.pos-F'), { maxHeightPct: 0.04, minFont: 12 });
+  fitFieldText(page.querySelector('.pos-G'), { maxHeightPct: 0.04, minFont: 9.5 });
+}
+
+function renderPages(rows, colMap) {
+  pagesDiv.innerHTML = '';
+  rows.forEach((row, i) => {
+    const page = document.createElement('div');
+    page.className = 'a5-page';
+    page.id = 'page-' + i;
+    if (bgDataURL) page.style.backgroundImage = `url('${bgDataURL}')`;
+
+    const num = document.createElement('div');
+    num.className = 'page-num';
+    num.textContent = 'Page ' + (i + 1);
+    page.appendChild(num);
+
+    [
+      { cls: 'pos-C-top field-mask field-single', key: 'C' },
+      { cls: 'pos-A field-mask field-single field-strong', key: 'A' },
+      { cls: 'pos-B field-mask field-single field-strong', key: 'B' },
+      { cls: 'pos-C-bot field-mask field-single', key: 'C' },
+      { cls: 'pos-D field-mask field-single field-strong', key: 'D' },
+      { cls: 'pos-E field-mask field-single', key: 'E' },
+      { cls: 'pos-F field-mask field-single field-strong', key: 'F' },
+      { cls: 'pos-G field-mask field-single field-strong', key: 'G' },
+    ].forEach(f => {
+      const div = document.createElement('div');
+      div.className   = 'field ' + f.cls;
+      div.textContent = val(row, colMap, f.key);
+      page.appendChild(div);
+    });
+
+    pagesDiv.appendChild(page);
+    fitPageText(page);
+  });
+}
+
+// ── PDF export ──
+async function downloadPDF() {
+  const pages = document.querySelectorAll('.a5-page');
+  if (!pages.length) return;
+
+  pdfBtn.disabled = printBtn.disabled = true;
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+
+  const pdf = new jsPDF({ unit: 'mm', format: 'a5', orientation: 'portrait' });
+
+  for (let i = 0; i < pages.length; i++) {
+    progressLabel.textContent = 'Generating page ' + (i+1) + ' of ' + pages.length + '…';
+    progressBar.style.width = Math.round((i / pages.length) * 100) + '%';
+
+    const badge = pages[i].querySelector('.page-num');
+    if (badge) badge.style.visibility = 'hidden';
+    pages[i].style.border = 'none';
+
+    const canvas = await html2canvas(pages[i], {
+      scale: 4,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    pages[i].style.border = '';
+    if (badge) badge.style.visibility = '';
+
+    const imgData = canvas.toDataURL('image/png');
+    if (i > 0) pdf.addPage([148, 210], 'portrait');
+    pdf.addImage(imgData, 'PNG', 0, 0, 148, 210, '', 'FAST');
+  }
+
+  progressBar.style.width = '100%';
+  progressLabel.textContent = '✅ Done! Saving…';
+  pdf.save('a5_overlay.pdf');
+
+  setTimeout(() => {
+    progressWrap.style.display = 'none';
+    progressBar.style.width = '0%';
+    progressLabel.textContent = '';
+    pdfBtn.disabled = printBtn.disabled = false;
+  }, 1800);
+}
+</script>
+</body>
+</html>
